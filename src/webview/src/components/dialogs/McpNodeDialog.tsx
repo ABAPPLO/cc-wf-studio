@@ -13,14 +13,14 @@ import { useEffect, useState } from 'react';
 import { useMcpCreationWizard, WizardStep } from '../../hooks/useMcpCreationWizard';
 import { useTranslation } from '../../i18n/i18n-context';
 import { useWorkflowStore } from '../../stores/workflow-store';
+import { WizardStepIndicator } from '../common/WizardStepIndicator';
 import { McpServerList } from '../mcp/McpServerList';
 import { McpToolList } from '../mcp/McpToolList';
 import { McpToolSearch } from '../mcp/McpToolSearch';
 import { AiParameterConfigInput } from '../mode-selection/AiParameterConfigInput';
 import { AiToolSelectionInput } from '../mode-selection/AiToolSelectionInput';
-import { ParameterConfigModeStep } from '../mode-selection/ParameterConfigModeStep';
+import { McpModeSelectionStep } from '../mode-selection/McpModeSelectionStep';
 import { ParameterDetailedConfigStep } from '../mode-selection/ParameterDetailedConfigStep';
-import { ToolSelectionModeStep } from '../mode-selection/ToolSelectionModeStep';
 
 interface McpNodeDialogProps {
   isOpen: boolean;
@@ -232,18 +232,31 @@ export function McpNodeDialog({ isOpen, onClose }: McpNodeDialogProps) {
           </div>
         );
 
-      case WizardStep.ToolSelectionMethod:
+      case WizardStep.ModeSelection:
         return (
-          <ToolSelectionModeStep
-            selectedMode={wizard.state.toolSelectionMode}
+          <McpModeSelectionStep
+            selectedMode={wizard.state.selectedMode}
             onModeChange={(mode) => {
-              wizard.setToolSelectionMode(mode);
+              wizard.setSelectedMode(mode);
               setError(null);
             }}
           />
         );
 
-      case WizardStep.ToolSelection:
+      case WizardStep.ToolOrTaskConfig:
+        if (wizard.state.selectedMode === 'aiToolSelection') {
+          return (
+            <AiToolSelectionInput
+              value={wizard.state.naturalLanguageTaskDescription}
+              onChange={(value) => {
+                wizard.setNaturalLanguageTaskDescription(value);
+                setError(null);
+              }}
+              showValidation={showValidation}
+            />
+          );
+        }
+        // aiParameterConfig / manualParameterConfig → Tool selection
         return (
           <div>
             <h3
@@ -271,42 +284,20 @@ export function McpNodeDialog({ isOpen, onClose }: McpNodeDialogProps) {
           </div>
         );
 
-      case WizardStep.ParameterConfigMethod:
-        return (
-          <ParameterConfigModeStep
-            selectedMode={wizard.state.parameterConfigMode}
-            onModeChange={(mode) => {
-              wizard.setParameterConfigMode(mode);
-              setError(null);
-            }}
-          />
-        );
-
-      case WizardStep.NaturalLanguageTask:
-        return (
-          <AiToolSelectionInput
-            value={wizard.state.naturalLanguageTaskDescription}
-            onChange={(value) => {
-              wizard.setNaturalLanguageTaskDescription(value);
-              setError(null);
-            }}
-            showValidation={showValidation}
-          />
-        );
-
-      case WizardStep.NaturalLanguageParam:
-        return (
-          <AiParameterConfigInput
-            value={wizard.state.aiParameterConfigDescription}
-            onChange={(value) => {
-              wizard.setAiParameterConfigDescription(value);
-              setError(null);
-            }}
-            showValidation={showValidation}
-          />
-        );
-
-      case WizardStep.ParameterDetailedConfig:
+      case WizardStep.FinalConfig:
+        if (wizard.state.selectedMode === 'aiParameterConfig') {
+          return (
+            <AiParameterConfigInput
+              value={wizard.state.aiParameterConfigDescription}
+              onChange={(value) => {
+                wizard.setAiParameterConfigDescription(value);
+                setError(null);
+              }}
+              showValidation={showValidation}
+            />
+          );
+        }
+        // manualParameterConfig
         return (
           <ParameterDetailedConfigStep
             serverId={wizard.state.selectedServer?.id || ''}
@@ -392,17 +383,22 @@ export function McpNodeDialog({ isOpen, onClose }: McpNodeDialogProps) {
             </Dialog.Title>
 
             {/* Step Indicator */}
+            <WizardStepIndicator
+              currentStep={wizard.state.currentStep}
+              totalSteps={wizard.totalSteps}
+            />
+
+            {/* Visually Hidden Accessibility Description */}
             <Dialog.Description
               style={{
-                marginBottom: '20px',
-                fontSize: '12px',
-                color: 'var(--vscode-descriptionForeground)',
+                position: 'absolute',
+                width: '1px',
+                height: '1px',
+                overflow: 'hidden',
+                clip: 'rect(0, 0, 0, 0)',
               }}
             >
-              {t('mcp.dialog.wizardStep', {
-                current: wizard.state.currentStep.toString(),
-                total: '7',
-              })}
+              Step {wizard.state.currentStep} of {wizard.totalSteps}
             </Dialog.Description>
 
             {/* Error Message */}
